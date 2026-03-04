@@ -14,6 +14,7 @@ import { Route as ReposRouteImport } from './routes/repos'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReposIndexRouteImport } from './routes/repos.index'
+import { Route as ReportsPreviewRouteImport } from './routes/reports.preview'
 import { Route as ReportsReportIdRouteImport } from './routes/reports.$reportId'
 import { Route as ReposOwnerRepoCommitsRouteImport } from './routes/repos.$owner.$repo.commits'
 
@@ -42,6 +43,11 @@ const ReposIndexRoute = ReposIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ReposRoute,
 } as any)
+const ReportsPreviewRoute = ReportsPreviewRouteImport.update({
+  id: '/preview',
+  path: '/preview',
+  getParentRoute: () => ReportsRoute,
+} as any)
 const ReportsReportIdRoute = ReportsReportIdRouteImport.update({
   id: '/$reportId',
   path: '/$reportId',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/repos': typeof ReposRouteWithChildren
   '/test': typeof TestRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
+  '/reports/preview': typeof ReportsPreviewRoute
   '/repos/': typeof ReposIndexRoute
   '/repos/$owner/$repo/commits': typeof ReposOwnerRepoCommitsRoute
 }
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsRouteWithChildren
   '/test': typeof TestRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
+  '/reports/preview': typeof ReportsPreviewRoute
   '/repos': typeof ReposIndexRoute
   '/repos/$owner/$repo/commits': typeof ReposOwnerRepoCommitsRoute
 }
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/repos': typeof ReposRouteWithChildren
   '/test': typeof TestRoute
   '/reports/$reportId': typeof ReportsReportIdRoute
+  '/reports/preview': typeof ReportsPreviewRoute
   '/repos/': typeof ReposIndexRoute
   '/repos/$owner/$repo/commits': typeof ReposOwnerRepoCommitsRoute
 }
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/repos'
     | '/test'
     | '/reports/$reportId'
+    | '/reports/preview'
     | '/repos/'
     | '/repos/$owner/$repo/commits'
   fileRoutesByTo: FileRoutesByTo
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/test'
     | '/reports/$reportId'
+    | '/reports/preview'
     | '/repos'
     | '/repos/$owner/$repo/commits'
   id:
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/repos'
     | '/test'
     | '/reports/$reportId'
+    | '/reports/preview'
     | '/repos/'
     | '/repos/$owner/$repo/commits'
   fileRoutesById: FileRoutesById
@@ -153,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReposIndexRouteImport
       parentRoute: typeof ReposRoute
     }
+    '/reports/preview': {
+      id: '/reports/preview'
+      path: '/preview'
+      fullPath: '/reports/preview'
+      preLoaderRoute: typeof ReportsPreviewRouteImport
+      parentRoute: typeof ReportsRoute
+    }
     '/reports/$reportId': {
       id: '/reports/$reportId'
       path: '/$reportId'
@@ -172,10 +191,12 @@ declare module '@tanstack/react-router' {
 
 interface ReportsRouteChildren {
   ReportsReportIdRoute: typeof ReportsReportIdRoute
+  ReportsPreviewRoute: typeof ReportsPreviewRoute
 }
 
 const ReportsRouteChildren: ReportsRouteChildren = {
   ReportsReportIdRoute: ReportsReportIdRoute,
+  ReportsPreviewRoute: ReportsPreviewRoute,
 }
 
 const ReportsRouteWithChildren =

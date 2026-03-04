@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { client } from "@/api-route";
+import { MesseboLogo } from "@/components/messebo-logo";
 import {
   Card,
   CardContent,
@@ -9,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Star,
   GitFork,
@@ -169,6 +170,8 @@ function CommitSummary({ owner, repo }: { owner: string; repo: string }) {
 }
 
 function RouteComponent() {
+  const [sortBy, setSortBy] = useState<"recent" | "name" | "stars">("recent");
+
   const {
     data: repoInfo,
     isLoading: isLoadingInfo,
@@ -191,6 +194,25 @@ function RouteComponent() {
     queryKey: ["org-repos"],
     queryFn: fetchOrgRepos,
   });
+
+  // Sort repos based on selected criteria
+  const sortedRepos = useMemo(() => {
+    if (!orgRepos) return [];
+    const repos = [...orgRepos];
+    switch (sortBy) {
+      case "recent":
+        return repos.sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        );
+      case "name":
+        return repos.sort((a, b) => a.name.localeCompare(b.name));
+      case "stars":
+        return repos.sort((a, b) => b.stargazers_count - a.stargazers_count);
+      default:
+        return repos;
+    }
+  }, [orgRepos, sortBy]);
 
   if (errorInfo || errorIssues || errorOrgRepos) {
     return (
@@ -223,21 +245,72 @@ function RouteComponent() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="flex flex-col gap-4">
-        {orgRepos && orgRepos?.length > 1 && (
-          <div className="flex items-center gap-2">
-            <p className="text-3xl font-bold">{orgRepos[0]?.owner?.login}</p>
-            <Badge variant="secondary" className="font-mono">
-              {orgRepos[0]?.owner?.type}
-            </Badge>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {orgRepos && orgRepos?.length > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <MesseboLogo className="h-14 w-auto" />
+                <div className="flex flex-col items-start justify-start">
+                  <p className="text-3xl font-bold">
+                    {orgRepos[0]?.owner?.login}
+                  </p>
+                  <Badge variant="secondary" className="font-mono">
+                    {orgRepos[0]?.owner?.type}
+                  </Badge>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        <span> There are {orgRepos?.length} repositories.</span>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Sort by:</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setSortBy("recent")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  sortBy === "recent"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                Recent
+              </button>
+              <button
+                onClick={() => setSortBy("name")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  sortBy === "name"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                Name
+              </button>
+              <button
+                onClick={() => setSortBy("stars")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  sortBy === "stars"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80"
+                }`}
+              >
+                Stars
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="ml-4">
+        <div>
+          <span className="text-lg">
+            There are {orgRepos?.length} repositories.
+          </span>
+        </div>
       </div>
       {/* 
          the organizational repos list 
       */}
       <div className="flex flex-col gap-4">
-        {orgRepos?.map((repo) => (
+        {sortedRepos?.map((repo) => (
           <div
             key={repo.id}
             className="relative overflow-hidden border bg-card p-8 shadow-sm"

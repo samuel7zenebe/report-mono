@@ -18,18 +18,9 @@ export const auth = betterAuth({
     "https://vercel-with-neon-postgres-indol-chi.vercel.app/",
   ], // Allow requests from Next.js origin
   socialProviders: {
-    microsoft: {
-      clientId: process.env.MICROSOFT_CLIENT_ID!,
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-      tenantId: "common",
-      scope: [
-        "Files.ReadWrite",
-        "User.Read",
-        "offline_access",
-        "openid",
-        "profile",
-        "email",
-      ],
+    github: {
+      clientId: "Ov23li4KrnQ2yqsIlUWC",
+      clientSecret: "53a56b2b4c9864d74ea45201c0480bc3c55617ad",
     },
   },
   account: {

@@ -337,6 +337,265 @@ const ExportSummariesSchema = z.object({
 });
 
 excelRouter.get(
+  "/preview",
+  zValidator("query", ExportSummariesSchema),
+  async (c) => {
+    try {
+      const { start, end } = c.req.valid("query");
+
+      const range: DateRange = {
+        start: start ? startOfDay(new Date(start)) : startOfMonth(new Date()),
+        end: end ? endOfDay(new Date(end)) : endOfMonth(new Date()),
+      };
+
+      const commits = await fetchCommitsByRange(range);
+      const repoGroups = groupCommitsByRepo(commits);
+
+      // Generate AI technical summaries for each repository
+      const previewData = await Promise.all(
+        Object.entries(repoGroups).map(async ([repoName, repoCommits]) => {
+          const summary = await getAiTechnicalSummary(repoName, repoCommits);
+          return {
+            repository: repoName,
+            summary,
+            commitCount: repoCommits.length,
+          };
+        }),
+      );
+
+      return c.json({
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+        data: previewData,
+      });
+    } catch (err) {
+      console.error("Preview Error:", err);
+      return c.json({ error: "Failed to generate preview" }, 500);
+    }
+  },
+);
+
+// Endpoint to export Excel with custom summaries (edited by user)
+excelRouter.post(
+  "/export-with-custom-summaries",
+  zValidator(
+    "json",
+    z.object({
+      start: z.string().optional(),
+      end: z.string().optional(),
+      summaries: z.array(
+        z.object({
+          repository: z.string(),
+          summary: z.string(),
+        }),
+      ),
+    }),
+  ),
+  async (c) => {
+    try {
+      const { start, end, summaries } = c.req.valid("json");
+
+      const range: DateRange = {
+        start: start ? startOfDay(new Date(start)) : startOfMonth(new Date()),
+        end: end ? endOfDay(new Date(end)) : endOfMonth(new Date()),
+      };
+
+      const commits = await fetchCommitsByRange(range);
+      const weeks = calculateTimelineWeeks(range);
+
+      const templatePath = path.resolve(
+        process.cwd(),
+        "server/month-template.xlsx",
+      );
+      const workbook = new Excel.Workbook();
+      await workbook.xlsx.readFile(templatePath);
+      const sheet = workbook.worksheets[0];
+
+      if (!sheet) throw new Error("Template sheet not found");
+
+      // --- 1. Top Header Styling (Row 27) ---
+      const dateLabel =
+        format(range.start, "MMMM d") === format(range.end, "MMMM d")
+          ? format(range.start, "MMMM yyyy").toUpperCase()
+          : `${format(range.start, "MMMM d")} — ${format(range.end, "MMMM d, yyyy")}`.toUpperCase();
+
+      const titleCell = sheet.getCell("C27");
+      titleCell.value = `TECHNICAL ACTIVITY REPORT: ${dateLabel}`;
+      titleCell.font = {
+        bold: true,
+        size: 16,
+        color: { argb: "FF1E293B" },
+        name: "Calibri",
+      };
+      sheet.getRow(27).height = 40;
+      titleCell.alignment = { vertical: "middle", horizontal: "left" };
+
+      // --- 2. Table Header Styling (Row 28) ---
+      const headerRow = sheet.getRow(28);
+      headerRow.height = 35;
+
+      const colC = headerRow.getCell(3);
+      colC.value = "REPOSITORY / SCOPE";
+      const colD = headerRow.getCell(4);
+      colD.value = "TECHNICAL ACHIEVEMENTS & KEY CONTRIBUTIONS";
+
+      [colC, colD].forEach((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF0F172A" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "medium" },
+          left: { style: "thin" },
+          bottom: { style: "medium" },
+          right: { style: "thin" },
+        };
+      });
+
+      // Dynamic Week Headers
+      weeks.forEach((week, index) => {
+        const cell = headerRow.getCell(5 + index);
+        cell.value = week.label;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 9 };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF334155" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "medium" },
+          left: { style: "thin" },
+          bottom: { style: "medium" },
+          right: { style: "thin" },
+        };
+        sheet.getColumn(5 + index).width = 12;
+      });
+
+      // --- 3. Data Population with Custom Summaries ---
+      let currentRowNum = 29;
+      const repoGroups = groupCommitsByRepo(commits);
+
+      for (const [repoName, repoCommits] of Object.entries(repoGroups)) {
+        const row = sheet.getRow(currentRowNum);
+
+        // Find custom summary or use AI-generated one
+        const customSummary = summaries.find(
+          (s) => s.repository.toLowerCase() === repoName.toLowerCase(),
+        );
+
+        // Repo Name (Column C)
+        const repoCell = row.getCell(3);
+        repoCell.value = repoName.toUpperCase();
+        repoCell.font = { bold: true, size: 10, color: { argb: "FF334155" } };
+        repoCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: currentRowNum % 2 === 0 ? "FFF8FAFC" : "FFFFFFFF" },
+        };
+        repoCell.alignment = { vertical: "top", horizontal: "left", indent: 1 };
+        repoCell.border = {
+          left: { style: "medium", color: { argb: "FF0F172A" } },
+          right: { style: "thin" },
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+        };
+
+        // Summary (Column D) - use custom if provided
+        const summaryCell = row.getCell(4);
+        summaryCell.value = customSummary
+          ? customSummary.summary
+          : await getAiTechnicalSummary(repoName, repoCommits);
+        summaryCell.font = { size: 10, color: { argb: "FF475569" } };
+        summaryCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: currentRowNum % 2 === 0 ? "FFF8FAFC" : "FFFFFFFF" },
+        };
+        summaryCell.alignment = {
+          wrapText: true,
+          vertical: "top",
+          indent: 1,
+        };
+        summaryCell.border = {
+          left: { style: "thin" },
+          right: { style: "thin" },
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+        };
+
+        // Timeline Shading (Column E+)
+        weeks.forEach((week, index) => {
+          const weekCell = row.getCell(5 + index);
+          const hasActivity = repoCommits.some((c) =>
+            isWithinInterval(new Date(c.date), {
+              start: week.start,
+              end: week.end,
+            }),
+          );
+
+          weekCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: {
+              argb: hasActivity
+                ? "FF0F172A"
+                : currentRowNum % 2 === 0
+                  ? "FFF8FAFC"
+                  : "FFFFFFFF",
+            },
+          };
+
+          if (hasActivity) {
+            weekCell.font = { color: { argb: "FFFFFFFF" } };
+          }
+
+          weekCell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+
+        row.getCell(5 + weeks.length - 1).border = {
+          ...row.getCell(5 + weeks.length - 1).border,
+          right: { style: "medium", color: { argb: "FF0F172A" } },
+        };
+
+        const lineCount = summaryCell.value?.toString().split("\n").length || 1;
+        row.height = Math.max(50, lineCount * 18 + 20);
+
+        currentRowNum++;
+      }
+
+      const finalRow = sheet.getRow(currentRowNum - 1);
+      for (let i = 3; i < 5 + weeks.length; i++) {
+        const cell = finalRow.getCell(i);
+        cell.border = {
+          ...cell.border,
+          bottom: { style: "medium", color: { argb: "FF0F172A" } },
+        };
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      return c.body(buffer, 200, {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="Premium_Technical_Report_${format(range.start, "yyyy-MM")}.xlsx"`,
+      });
+    } catch (err) {
+      console.error("Excel Export Error:", err);
+      return c.json({ error: "Failed to generate report" }, 500);
+    }
+  },
+);
+
+excelRouter.get(
   "/export-monthly-summaries",
   zValidator("query", ExportSummariesSchema),
   async (c) => {

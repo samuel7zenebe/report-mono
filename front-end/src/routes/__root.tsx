@@ -6,12 +6,16 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { GitBranch, FileText, FolderGit2 } from "lucide-react";
 import { UserNav } from "@/components/user-nav";
+import { authClient } from "@/lib/authClient";
+
 export const Route = createRootRoute({
   component: RootComponent,
 });
 
 function RootComponent() {
   const queryClient = new QueryClient();
+  const { data: session } = authClient.useSession();
+
   return (
     <React.StrictMode>
       <React.Fragment>
@@ -41,13 +45,20 @@ function RootComponent() {
                         <GitBranch className="h-4 w-4" />
                         <span>Repositories</span>
                       </NavLink>
-                      <NavLink
-                        to="/reports"
-                        className="group relative flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[status=active]:text-primary data-[status=active]:bg-primary/10 rounded-full"
-                      >
-                        <FileText className="h-4 w-4" />
-                        <span>Summaries</span>
-                      </NavLink>
+                      {session ? (
+                        <NavLink
+                          to="/reports"
+                          className="group relative flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[status=active]:text-primary data-[status=active]:bg-primary/10 rounded-full"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span>Summaries</span>
+                        </NavLink>
+                      ) : (
+                        <span className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground/50 cursor-not-allowed">
+                          <FileText className="h-4 w-4" />
+                          <span>Summaries</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 

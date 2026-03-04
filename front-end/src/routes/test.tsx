@@ -1,11 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import useReports from "@/hooks/use-reports";
 export const Route = createFileRoute("/test")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  const { commitsList } = useReports();
-  console.log(commitsList);
-  return <div>Hello "/test"! {commitsList?.message}</div>;
+  console.log("Hey Baby This is the most recommended way of analyzing data");
+  return <h1> Testing Component : </h1>;
 }
